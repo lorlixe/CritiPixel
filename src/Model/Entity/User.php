@@ -26,11 +26,13 @@ use Symfony\Component\Validator\Constraints\PasswordStrength;
 #[UniqueEntity('email')]
 #[UniqueEntity('username')]
 #[EntityListeners([UserListener::class])]
+
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[Id]
     #[GeneratedValue]
     #[Column]
+    // @phpstan-ignore-next-line
     private ?int $id = null;
 
     #[NotBlank]

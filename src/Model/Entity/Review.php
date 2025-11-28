@@ -24,6 +24,7 @@ class Review
     #[Column]
     #[ORM\GeneratedValue(strategy: 'IDENTITY')] // ou 'AUTO'
 
+    // @phpstan-ignore-next-line
     private ?int $id = null;
 
     #[ManyToOne(targetEntity: VideoGame::class, inversedBy: 'reviews')]

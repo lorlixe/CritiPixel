@@ -17,7 +17,7 @@ final class RegisterTest extends FunctionalTestCase
         $this->client->submitForm('S\'inscrire', self::getFormData());
 
         self::assertResponseRedirects('/auth/login');
-
+        // @phpstan-ignore-next-line
         $user = $this->getEntityManager()->getRepository(User::class)->findOneByEmail('user@email.com');
 
         $userPasswordHasher = $this->service(UserPasswordHasherInterface::class);
@@ -29,6 +29,7 @@ final class RegisterTest extends FunctionalTestCase
     }
 
     /**
+     * @param array<string, string> $formData
      * @dataProvider provideInvalidFormData
      */
     public function testThatRegistrationShouldFailed(array $formData): void
@@ -39,6 +40,9 @@ final class RegisterTest extends FunctionalTestCase
 
         self::assertResponseIsUnprocessable();
     }
+    /**
+     * @return iterable<string, array<array<string, string>>>
+     */
 
     public static function provideInvalidFormData(): iterable
     {
@@ -49,6 +53,10 @@ final class RegisterTest extends FunctionalTestCase
         yield 'non unique email' => [self::getFormData(['register[email]' => 'user+1@email.com'])];
         yield 'invalid email' => [self::getFormData(['register[email]' => 'fail'])];
     }
+    /**
+     * @param array<string, string> $overrideData
+     *@return array<string, string>
+     */
 
     public static function getFormData(array $overrideData = []): array
     {

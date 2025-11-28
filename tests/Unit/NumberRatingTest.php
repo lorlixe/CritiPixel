@@ -66,6 +66,9 @@ final class NumberRatingTest extends TestCase
         self::assertSame($four,  $n->getNumberOfFour());
         self::assertSame($five,  $n->getNumberOfFive());
     }
+    /**
+     * @return iterable<string, array<int>>
+     */
 
     public static function provideMultiIncrements(): iterable
     {

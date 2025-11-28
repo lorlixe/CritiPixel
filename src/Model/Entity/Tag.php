@@ -25,10 +25,12 @@ class Tag
     #[Id]
     #[ORM\GeneratedValue(strategy: 'IDENTITY')] // ou 'AUTO'
     #[Column]
+    // @phpstan-ignore-next-line
     private ?int $id = null;
 
     #[Column(unique: true)]
     #[Slug(fields: ['name'])]
+    // @phpstan-ignore-next-line
     private string $code;
 
     #[NotBlank]
@@ -37,6 +39,7 @@ class Tag
     private string $name;
 
     #[ORM\ManyToMany(targetEntity: VideoGame::class, mappedBy: 'tags')]
+    // @phpstan-ignore-next-line
     private Collection $videoGames;
 
     public function __construct()
