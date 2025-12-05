@@ -34,6 +34,7 @@ final class AuthController extends AbstractController
         $form = $this->createForm(RegisterType::class, $user)->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+
             $entityManager->persist($user);
             $entityManager->flush();
             $this->addFlash('success', 'Inscription réussie. Vous pouvez vous connecter !');

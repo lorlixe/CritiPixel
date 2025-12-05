@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Model\Entity;
 
+use App\Model\Entity\Review;
+use App\Model\Entity\Tag;
+use App\Model\Entity\User;
 use DateTimeImmutable;
-use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -62,7 +64,7 @@ class VideoGame
     private DateTimeImmutable $releaseDate;
 
     #[Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
-    private ?DateTimeImmutable $updatedAt;
+    private ?DateTimeImmutable $updatedAt = null;
 
     #[Column(type: Types::TEXT, nullable: true)]
     private ?string $test = null;
@@ -95,12 +97,21 @@ class VideoGame
         $this->numberOfRatingsPerValue = new NumberOfRatingPerValue();
         $this->tags = new ArrayCollection();
         $this->reviews = new ArrayCollection();
-        $this->updatedAt = new DateTimeImmutable();
+        // On laisse $updatedAt à null au départ, il sera mis à jour quand nécessaire
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    /**
+     * Méthode "technique" pour faire plaisir à Doctrine / PHPStan.
+     * Tu ne l'appelles jamais toi-même.
+     */
+    public function setId(int $id): void
+    {
+        $this->id = $id;
     }
 
     public function getTitle(): string
@@ -117,6 +128,14 @@ class VideoGame
     public function getSlug(): string
     {
         return $this->slug;
+    }
+
+    /**
+     * Utilisée par Doctrine / Gedmo\Slug (ou au moins visible par PHPStan).
+     */
+    public function setSlug(string $slug): void
+    {
+        $this->slug = $slug;
     }
 
     public function setImageFile(?File $imageFile = null): void
@@ -177,6 +196,11 @@ class VideoGame
         return $this;
     }
 
+    public function getUpdatedAt(): ?DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
     public function getTest(): ?string
     {
         return $this->test;
@@ -233,6 +257,8 @@ class VideoGame
 
     public function hasAlreadyReview(User $user): bool
     {
-        return $this->reviews->exists(static fn(int $key, Review $review): bool => $review->getUser() === $user);
+        return $this->reviews->exists(
+            static fn(int $key, Review $review): bool => $review->getUser() === $user
+        );
     }
 }

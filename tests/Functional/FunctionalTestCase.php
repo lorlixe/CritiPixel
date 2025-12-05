@@ -17,7 +17,21 @@ abstract class FunctionalTestCase extends WebTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->client = static::createClient();
+        $this->resetDatabase();
+    }
+
+    private function resetDatabase(): void
+    {
+        $entityManager = $this->getEntityManager();
+
+        $entityManager->createQuery('DELETE FROM App\Model\Entity\User u 
+                                 WHERE u.username = :username')
+            ->setParameter('username', 'username')
+            ->execute();
+
+        $entityManager->clear();
     }
 
     protected function getEntityManager(): EntityManagerInterface

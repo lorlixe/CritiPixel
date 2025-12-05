@@ -128,7 +128,8 @@ final class VideoGamesList implements Countable, IteratorAggregate
             );
         }
 
-        $this->pagination->init(count($this->data), count($this));
+        $this->pagination->init(count($this->data), iterator_count($this->data));
+
 
         return $this;
     }
