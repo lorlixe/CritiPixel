@@ -1,9 +1,16 @@
 name: Continuous integration
-on: [push]
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
 jobs:
   ci:
     name: Continuous Integration
     runs-on: ${{ matrix.operating-system }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -11,16 +18,19 @@ jobs:
         php-versions: ["8.2", "8.3"]
 
     steps:
+      # Checkout du code
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Installation de PHP
       - name: Setup PHP, with composer and extensions
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_pgsql # CHANGÉ : pdo_pgsql pour PostgreSQL
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql
           coverage: xdebug
 
+      # Cache Composer
       - name: Get composer cache directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
@@ -32,50 +42,75 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
+      # Validation du composer.json
+      - name: Validate composer.json
+        run: composer validate
+
       # Démarrage de Docker Compose
       - name: Start Docker Compose
         run: docker compose up -d
 
-      # Attendre que PostgreSQL soit prêt
-      - name: Wait for PostgreSQL to be ready
+      # Attendre que MySQL soit prêt
+      - name: Wait for MySQL to be ready
         run: |
-          echo "Waiting for PostgreSQL to be ready..."
+          echo "Waiting for MySQL to be ready..."
           for i in {1..30}; do
-            if docker compose exec -T postgres pg_isready -U postgres 2>/dev/null; then
-              echo "PostgreSQL is ready!"
+            if docker compose exec -T mysql mysqladmin ping -h localhost -uroot -proot --silent 2>/dev/null; then
+              echo "✅ MySQL is ready!"
               break
             fi
-            echo "Attempt $i: PostgreSQL not ready yet, waiting..."
+            echo "⏳ Attempt $i/30: MySQL not ready yet, waiting 2 seconds..."
             sleep 2
           done
-          docker compose exec -T postgres pg_isready -U postgres || exit 1
+          # Vérification finale
+          if ! docker compose exec -T mysql mysqladmin ping -h localhost -uroot -proot --silent 2>/dev/null; then
+            echo "❌ MySQL failed to start"
+            docker compose logs mysql
+            exit 1
+          fi
+
+      # Installation des dépendances
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
 
       # Configuration de l'environnement de test
       - name: Setup test environment
         run: |
           if [ -f .env.test ]; then
             cp .env.test .env.test.local
+          else
+            touch .env.test.local
           fi
           echo "APP_ENV=test" >> .env.test.local
-          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/criti-pixel_test?serverVersion=16&charset=utf8" >> .env.test.local
+          echo "APP_DEBUG=1" >> .env.test.local
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/criti-pixel_test?serverVersion=8.0" >> .env.test.local
 
-      # Installation et build
-      - name: Build
+      # Build de la base de données et fixtures
+      - name: Build database and load fixtures
         run: |
-          composer install
-          php bin/console doctrine:database:drop -f --if-exists --env=test
+          php bin/console doctrine:database:drop --force --if-exists --env=test
           php bin/console doctrine:database:create --env=test
-          php bin/console doctrine:migrations:migrate -n --env=test
-          php bin/console doctrine:fixtures:load -n --env=test
+          php bin/console doctrine:migrations:migrate --no-interaction --env=test
+          php bin/console doctrine:fixtures:load --no-interaction --env=test
           php bin/console cache:clear --env=test
 
-      - name: Tests
-        run: php bin/phpunit --testdox
+      # Exécution des tests unitaires
+      - name: Run Unit Tests
+        run: php bin/phpunit tests/Unit --testdox
 
-      - name: Analysis
-        run: php vendor/bin/phpstan
+      # Exécution des tests fonctionnels
+      - name: Run Functional Tests
+        run: php bin/phpunit tests/Functional --testdox
+
+      # Exécution de tous les tests avec couverture
+      - name: Run Tests with Coverage
+        run: php bin/phpunit --coverage-text --coverage-clover=coverage.xml
+
+      # Analyse statique avec PHPStan
+      - name: Static Analysis (PHPStan)
+        run: php vendor/bin/phpstan analyse
 
       # Arrêt de Docker Compose
       - name: Stop Docker Compose
         if: always()
-        run: docker compose down
+        run: docker compose down -v
