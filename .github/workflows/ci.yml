@@ -67,7 +67,6 @@ jobs:
       # Chargement des fixtures (optionnel)
       - name: Load fixtures
         run: php bin/console doctrine:fixtures:load --env=test --no-interaction
-        continue-on-error: true
 
       # Exécution de PHPStan
       - name: Run PHPStan
