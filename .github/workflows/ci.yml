@@ -16,12 +16,21 @@ jobs:
       matrix:
         php-versions: ["8.2", "8.3"]
 
+    # Service MySQL directement dans GitHub Actions
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: critipixel_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
     steps:
-      # Checkout du code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Installation de PHP
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -29,7 +38,6 @@ jobs:
           extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json
           coverage: xdebug
 
-      # Cache Composer
       - name: Get composer cache directory
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
@@ -41,57 +49,33 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      # Validation du composer.json
-      - name: Validate composer.json and composer.lock
+      - name: Validate composer.json
         run: composer validate
 
-      # Installation des dépendances
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
-      # Démarrage de Docker Compose (si vous l'utilisez)
-      - name: Start Docker services
-        run: docker compose up -d
-
-      # Attendre que MySQL soit prêt
-      - name: Wait for MySQL
-        run: |
-          until docker compose exec -T db mysqladmin ping -h"127.0.0.1" --silent; do
-            echo "Waiting for MySQL..."
-            sleep 2
-          done
-
-      # Configuration de l'environnement
       - name: Setup test environment
         run: |
           cp .env.test .env.test.local
           echo "APP_ENV=test" >> .env.test.local
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/critipixel_test" >> .env.test.local
 
-      # Build (base de données + fixtures)
       - name: Build test database
         run: |
           php bin/console doctrine:database:drop --force --if-exists --env=test
           php bin/console doctrine:database:create --env=test
           php bin/console doctrine:migrations:migrate --no-interaction --env=test
-          php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate --env=test
+          php bin/console doctrine:fixtures:load --no-interaction --env=test
 
-      # Clear cache
       - name: Clear cache
         run: php bin/console cache:clear --env=test
 
-      # Exécution de PHPStan
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse
 
-      # Exécution des tests
       - name: Run Tests
         run: php bin/phpunit --testdox
 
-      # Exécution des tests avec couverture
       - name: Run Tests with Coverage
         run: XDEBUG_MODE=coverage php bin/phpunit --coverage-text --coverage-clover=coverage.xml
-
-      # Arrêt de Docker
-      - name: Stop Docker services
-        if: always()
-        run: docker compose down
