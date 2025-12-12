@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  symfony:
+    name: Symfony Tests & Quality (PHP ${{ matrix.php-versions }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-versions: ["8.2", "8.3"]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: critipixel_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      # Checkout du code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Installation de PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json, opcache
+          coverage: xdebug
+          tools: composer:v2
+
+      # Vérification de la version PHP
+      - name: Check PHP Version
+        run: php -v
+
+      # Validation du composer.json
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      # Installation des dépendances
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # Configuration de l'environnement de test
+      - name: Setup test environment
+        run: |
+          cp .env.test .env.test.local
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/critipixel_test" >> .env.test.local
+
+      # Création de la base de données de test
+      - name: Create test database
+        run: |
+          php bin/console doctrine:database:create --env=test --if-not-exists
+          php bin/console doctrine:schema:create --env=test
+
+      # Chargement des fixtures (optionnel)
+      - name: Load fixtures
+        run: php bin/console doctrine:fixtures:load --env=test --no-interaction
+        continue-on-error: true
+
+      # Exécution de PHPStan
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse src tests --level=8 --memory-limit=1G
+
+      # Exécution de PHP CS Fixer (vérification seulement)
+      - name: Run PHP CS Fixer
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff --verbose
+        continue-on-error: true
+
+      # Exécution des tests unitaires
+      - name: Run Unit Tests
+        run: vendor/bin/phpunit tests/Unit --testdox
+
+      # Exécution des tests fonctionnels
+      - name: Run Functional Tests
+        run: vendor/bin/phpunit tests/Functional --testdox
+        continue-on-error: true
+
+      # Exécution de tous les tests avec couverture de code
+      - name: Run All Tests with Coverage
+        run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml
+
+      # Upload du rapport de couverture vers Codecov (optionnel)
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      # Vérification de la qualité du code (métriques)
+      - name: Code Quality Report
+        run: |
+          echo "✅ Tests passed"
+          echo "✅ Static analysis passed"
+          echo "📊 Coverage report generated"
