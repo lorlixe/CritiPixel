@@ -16,6 +16,9 @@ use Doctrine\Persistence\ObjectManager;
 use Faker\Generator;
 use function array_fill_callback;
 
+/**
+ * @codeCoverageIgnore
+ */
 final class VideoGameFixtures extends Fixture implements DependentFixtureInterface
 {
     public function __construct(

@@ -38,8 +38,10 @@ class Tag
     #[Column(length: 30)]
     private string $name;
 
+    /**
+     * @var Collection<int, VideoGame>
+     */
     #[ORM\ManyToMany(targetEntity: VideoGame::class, mappedBy: 'tags')]
-    // @phpstan-ignore-next-line
     private Collection $videoGames;
 
     public function __construct()

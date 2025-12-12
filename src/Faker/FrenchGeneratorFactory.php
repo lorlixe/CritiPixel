@@ -7,6 +7,8 @@ namespace App\Faker;
 use Faker\Factory;
 use Faker\Generator;
 
+
+
 final readonly class FrenchGeneratorFactory
 {
     public static function create(): Generator

@@ -26,6 +26,14 @@ abstract class FunctionalTestCase extends WebTestCase
     {
         $entityManager = $this->getEntityManager();
 
+        $entityManager->createQuery('DELETE FROM App\Model\Entity\Review r 
+                                 WHERE r.user IN (
+                                     SELECT u FROM App\Model\Entity\User u 
+                                     WHERE u.email = :email
+                                 )')
+            ->setParameter('email', 'user+0@email.com')
+            ->execute();
+
         $entityManager->createQuery('DELETE FROM App\Model\Entity\User u 
                                  WHERE u.username = :username')
             ->setParameter('username', 'username')

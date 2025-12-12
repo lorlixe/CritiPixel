@@ -21,6 +21,7 @@ final class ShowTest extends FunctionalTestCase
         $this->login();
         $this->get('/jeu-video-3');
         self::assertResponseIsSuccessful();
+
         $this->submit(
             'Poster',
             [

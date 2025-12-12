@@ -97,7 +97,6 @@ class VideoGame
         $this->numberOfRatingsPerValue = new NumberOfRatingPerValue();
         $this->tags = new ArrayCollection();
         $this->reviews = new ArrayCollection();
-        // On laisse $updatedAt à null au départ, il sera mis à jour quand nécessaire
     }
 
     public function getId(): ?int
@@ -105,10 +104,7 @@ class VideoGame
         return $this->id;
     }
 
-    /**
-     * Méthode "technique" pour faire plaisir à Doctrine / PHPStan.
-     * Tu ne l'appelles jamais toi-même.
-     */
+
     public function setId(int $id): void
     {
         $this->id = $id;
@@ -130,9 +126,7 @@ class VideoGame
         return $this->slug;
     }
 
-    /**
-     * Utilisée par Doctrine / Gedmo\Slug (ou au moins visible par PHPStan).
-     */
+
     public function setSlug(string $slug): void
     {
         $this->slug = $slug;
