@@ -1,41 +1,24 @@
-name: CI
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-
+name: Continuous integration
+on: [push]
 jobs:
-  symfony:
-    name: Symfony Tests & Quality (PHP ${{ matrix.php-versions }})
-    runs-on: ubuntu-latest
-
+  ci:
+    name: Continuous Integration
+    runs-on: ${{ matrix.operating-system }}
     strategy:
       fail-fast: false
       matrix:
+        operating-system: [ubuntu-latest]
         php-versions: ["8.2", "8.3"]
-
-    # Service MySQL directement dans GitHub Actions
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: critipixel_test
-        ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP, with composer and extensions
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_pgsql # CHANGÉ : pdo_pgsql pour PostgreSQL
           coverage: xdebug
 
       - name: Get composer cache directory
@@ -49,33 +32,50 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      - name: Validate composer.json
-        run: composer validate
+      # Démarrage de Docker Compose
+      - name: Start Docker Compose
+        run: docker compose up -d
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+      # Attendre que PostgreSQL soit prêt
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U postgres 2>/dev/null; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Attempt $i: PostgreSQL not ready yet, waiting..."
+            sleep 2
+          done
+          docker compose exec -T postgres pg_isready -U postgres || exit 1
 
+      # Configuration de l'environnement de test
       - name: Setup test environment
         run: |
-          cp .env.test .env.test.local
+          if [ -f .env.test ]; then
+            cp .env.test .env.test.local
+          fi
           echo "APP_ENV=test" >> .env.test.local
-          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/critipixel_test" >> .env.test.local
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/criti-pixel_test?serverVersion=16&charset=utf8" >> .env.test.local
 
-      - name: Build test database
+      # Installation et build
+      - name: Build
         run: |
-          php bin/console doctrine:database:drop --force --if-exists --env=test
+          composer install
+          php bin/console doctrine:database:drop -f --if-exists --env=test
           php bin/console doctrine:database:create --env=test
-          php bin/console doctrine:migrations:migrate --no-interaction --env=test
-          php bin/console doctrine:fixtures:load --no-interaction --env=test
+          php bin/console doctrine:migrations:migrate -n --env=test
+          php bin/console doctrine:fixtures:load -n --env=test
+          php bin/console cache:clear --env=test
 
-      - name: Clear cache
-        run: php bin/console cache:clear --env=test
-
-      - name: Run PHPStan
-        run: vendor/bin/phpstan analyse
-
-      - name: Run Tests
+      - name: Tests
         run: php bin/phpunit --testdox
 
-      - name: Run Tests with Coverage
-        run: XDEBUG_MODE=coverage php bin/phpunit --coverage-text --coverage-clover=coverage.xml
+      - name: Analysis
+        run: php vendor/bin/phpstan
+
+      # Arrêt de Docker Compose
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down
