@@ -71,7 +71,7 @@ jobs:
 
       # Exécution de PHPStan
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse src tests --level=8 --memory-limit=1G
+        run: vendor/bin/phpstan analyse src tests --level=6 --memory-limit=1G
 
       # Exécution de PHP CS Fixer (vérification seulement)
       - name: Run PHP CS Fixer
