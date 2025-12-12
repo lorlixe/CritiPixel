@@ -140,8 +140,11 @@ final class Pagination implements IteratorAggregate, Countable
         ];
     }
 
+    /**
+     * @return int<0, max>
+     */
     public function count(): int
     {
-        return $this->getLastPage();
+        return max(0, $this->getLastPage());
     }
 }
